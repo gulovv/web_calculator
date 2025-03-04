@@ -1,0 +1,29 @@
+# Используем официальный Go образ
+FROM golang:1.19-alpine as builder
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем файлы проекта в контейнер
+COPY . .
+
+# Устанавливаем зависимости (создаст go.sum, если его нет)
+RUN go mod tidy
+
+# Компилируем оркестратор
+WORKDIR /app/cmd/orchestrator
+RUN go build -o orchestrator .
+
+# Создаем финальный образ
+FROM alpine:latest
+
+WORKDIR /app
+
+# Копируем скомпилированный бинарник
+COPY --from=builder /app/cmd/orchestrator/orchestrator .
+
+# Открываем порт, на котором будет работать оркестратор
+EXPOSE 8080
+
+# Запускаем оркестратор
+CMD ["./orchestrator"]

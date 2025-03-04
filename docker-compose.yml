@@ -1,0 +1,24 @@
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: cmd/orchestrator/Dockerfile.orchestrator
+    ports:
+      - "8080:8080"
+    networks:
+      - webnet
+    environment:
+      - SERVICE_NAME=orchestrator
+
+  agent:
+    build:
+      context: .
+      dockerfile: cmd/agent/Dockerfile.agent
+    networks:
+      - webnet
+    environment:
+      - SERVICE_NAME=agent
+
+networks:
+  webnet:
+    driver: bridge

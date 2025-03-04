@@ -1,0 +1,29 @@
+# Используем официальный Go образ
+FROM golang:1.19-alpine as builder
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем файлы проекта в контейнер
+COPY . .
+
+# Устанавливаем зависимости (создаст go.sum, если его нет)
+RUN go mod tidy
+
+# Компилируем агента
+WORKDIR /app/cmd/agent
+RUN go build -o agent .
+
+# Создаем финальный образ
+FROM alpine:latest
+
+WORKDIR /app
+
+# Копируем скомпилированный бинарник
+COPY --from=builder /app/cmd/agent/agent .
+
+# Открываем порт, если нужно для взаимодействия
+EXPOSE 8081
+
+# Запускаем агента
+CMD ["./agent"]
