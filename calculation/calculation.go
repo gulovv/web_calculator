@@ -23,8 +23,6 @@ type Token struct {
     Value string
 }
 //_______________________________________________________________________________________________________________________________
-
-// tokenize разбивает входную строку на токены.
 func Tokenize(input string) []Token {
     var tokens []Token
 
@@ -39,9 +37,13 @@ func Tokenize(input string) []Token {
             continue
         }
 
-        // Числа (включая десятичные)
-        if unicode.IsDigit(rune(c)) || c == '.' {
+        // Числа (включая десятичные), с учетом минуса перед числом или скобкой
+        if unicode.IsDigit(rune(c)) || c == '.' || (c == '-' && (i == 0 || !unicode.IsDigit(rune(input[i-1])) && input[i-1] != ')')) {
             start := i
+            // Если минус перед числом или после оператора
+            if c == '-' {
+                i++
+            }
             for i < len(input) && (unicode.IsDigit(rune(input[i])) || input[i] == '.') {
                 i++
             }
@@ -112,6 +114,7 @@ func (p *Parser) Eat(tokenType int) Token {
 func (p *Parser) ParseFactor() *Node {
     token := p.Current()
 
+    // Проверка для отрицательных чисел
     if token.Type == TokenNumber {
         p.Eat(TokenNumber)
         val, err := strconv.ParseFloat(token.Value, 64)
@@ -132,6 +135,7 @@ func (p *Parser) ParseFactor() *Node {
 //_______________________________________________________________________________________________________________________________
 
 // parseTerm обрабатывает умножение и деление.
+// parseTerm обрабатывает умножение и деление.
 func (p *Parser) ParseTerm() *Node {
     node := p.ParseFactor()
 
@@ -140,6 +144,12 @@ func (p *Parser) ParseTerm() *Node {
         if token.Type == TokenMultiply || token.Type == TokenDivide {
             p.Eat(token.Type)
             right := p.ParseFactor()
+
+            // Проверка на деление на ноль
+            if token.Type == TokenDivide && right.Value == 0 {
+                panic("[Ошибка] Деление на ноль!")
+            }
+
             fmt.Printf("[Парсер (умножение/деление)] Операция: %s с узлами (%v, %v)\n", token.Value, node, right) // Отладка: вывод операции
             if token.Type == TokenMultiply {
                 node = &Node{Operator: "*", Left: node, Right: right, Value: node.Value * right.Value}

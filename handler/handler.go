@@ -23,8 +23,18 @@ var (
     TaskIDCounter   int
 )
 
-var ValidExpressionRegex = regexp.MustCompile(`^\s*[\d\+\-\*/$begin:math:text$$end:math:text$\s]+\s*$`)
+// Проверка деления на ноль (отлавливает случаи: "/0", "/ 0", "/0.0", "/ 0.000")
+var DivisionByZeroRegex = regexp.MustCompile(`/\s*0(?:\.0+)?\b`)
 
+// Проверка на недопустимые числа с ведущими нулями, например "08" или "001"
+// Допускается "0" и "0.xxx", но не "0" за которыми сразу идут цифры без точки.
+var InvalidNumberRegex = regexp.MustCompile(`\b0\d+\b`)
+
+// Проверка на повторяющиеся операторы, включая пробелы между ними
+var InvalidOperatorsRegex = regexp.MustCompile(`[+\-*/]\s*([+\-*/])`)
+
+// Проверка на числа с запятыми
+var InvalidCommaInNumberRegex = regexp.MustCompile(`\d+,\d+`)
 //_______________________________________________________________________________________________________________________________
 
 // 1) Эндпоинт для добавления новой задачи
@@ -35,22 +45,45 @@ func AddTask(w http.ResponseWriter, r *http.Request) {
     err := json.NewDecoder(r.Body).Decode(&newTask)
     if err != nil {
         fmt.Println("Ошибка декодирования данных задачи:", err)
-        http.Error(w, "Некорректные данные задачи", http.StatusUnprocessableEntity) // 422
+        http.Error(w, "Некорректные данные задачи", http.StatusUnprocessableEntity)
         return
     }
-    // Проверка корректности выражения
-    if !ValidExpressionRegex.MatchString(newTask.Expression) {
-        fmt.Println("Ошибка: выражение содержит недопустимые символы:", newTask.Expression)
-        http.Error(w, "Выражение содержит недопустимые символы", http.StatusUnprocessableEntity) // 422
+    
+   
+    // Проверка на повторяющиеся операторы
+    if InvalidOperatorsRegex.MatchString(newTask.Expression) {
+        fmt.Println("Ошибка: выражение содержит повторяющиеся операторы:", newTask.Expression)
+        http.Error(w, "Выражение не должно содержать повторяющиеся операторы", http.StatusUnprocessableEntity) // 422
         return
     }
-
+    // Проверка на запятую 
+    if InvalidCommaInNumberRegex.MatchString(newTask.Expression) {
+        fmt.Println("Ошибка: выражение содержит недопустимую запятую в числе:", newTask.Expression)
+        http.Error(w, "Запятая в числе недопустима", http.StatusUnprocessableEntity)
+        return
+    }
+    
+    // Проверка деления на ноль
+    if DivisionByZeroRegex.MatchString(newTask.Expression) {
+        fmt.Println("Ошибка: деление на ноль в выражении:", newTask.Expression)
+        http.Error(w, "Деление на ноль невозможно", http.StatusUnprocessableEntity)
+        return
+    }
+    
+    // Проверка на недопустимые числа (например, 08)
+    if InvalidNumberRegex.MatchString(newTask.Expression) {
+        fmt.Println("Ошибка: выражение содержит числа с ведущими нулями:", newTask.Expression)
+        http.Error(w, "Числа с ведущими нулями недопустимы", http.StatusUnprocessableEntity)
+        return
+    }
+    
     // Проверка, что выражение не пустое
     if newTask.Expression == "" {
         fmt.Println("Ошибка: выражение отсутствует")
-        http.Error(w, "Выражение не должно быть пустым", http.StatusUnprocessableEntity) // 422
+        http.Error(w, "Выражение не должно быть пустым", http.StatusUnprocessableEntity)
         return
     }
+
 
     // Добавление задачи в очередь
     TaskMutex.Lock()
@@ -218,6 +251,7 @@ func DeleteAllTasks(w http.ResponseWriter, r *http.Request) {
 
     // Очистка завершённых задач
     CompletedTasks = make(map[int]Task)
+    TaskIDCounter = 0
 
     // Проверяем, что данные очищены
     fmt.Printf("Очистили TaskQueue: %v, CompletedTasks: %v\n", TaskQueue, CompletedTasks)

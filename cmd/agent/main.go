@@ -25,7 +25,15 @@ type Task struct {
 
 // Функция, которая получает задачу и отправляет результат
 func agent() {
+
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Printf("Ошибка при вычислении выражения: %v\n", r)
+        }
+    }()
     for {
+
+        
         // Получаем задачу
         resp, err := http.Get("http://orchestrator:8080/api/v1/task") // Получаем задачу с оркестратора
         if err != nil {
@@ -54,6 +62,7 @@ func agent() {
 
         // Получаем задачу из структуры Response
         task := response.Task
+        
 
         // Проверяем, если задача уже завершена
         if task.Status == "completed" {
@@ -66,6 +75,8 @@ func agent() {
         fmt.Println("Полученное выражение:", task.Expression)
         tokens := calculation.Tokenize(task.Expression)
 
+        
+
         // Парсинг: построение AST
         parser := calculation.Parser{Tokens: tokens}
         ast := parser.ParseExpression() // исправленный вызов функции
@@ -77,6 +88,7 @@ func agent() {
         task.Status = "completed" // Обновляем статус задачи на "completed"
         taskData, _ := json.Marshal(task)
 
+
         // Отправляем результат на оркестратор
         resp, err = http.Post("http://orchestrator:8080/api/v1/task/result", "application/json", bytes.NewBuffer(taskData))
         if err != nil {
@@ -84,6 +96,8 @@ func agent() {
             continue
         }
         resp.Body.Close()
+
+        
 
         fmt.Printf("Задача: %s, Результат: %f\n", task.Expression, task.Result)
 

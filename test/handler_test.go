@@ -134,6 +134,50 @@ func TestGetTask(t *testing.T) {
     }
 }
 
+func TestUpdateTaskResult(t *testing.T) {
+    handler.CompletedTasks = map[int]handler.Task{
+       1: {ID: 1, Expression: "2 + 2", Status: "pending"},
+    }
+
+    tests := []struct {
+        name           string
+        body           string
+        expectedStatus int
+    }{
+        {
+            name:           "Successful result update",
+            body:           `{"id": 1, "result": 4}`,
+            expectedStatus: http.StatusOK,
+        },
+        {
+            name:           "Task already completed",
+            body:           `{"id": 1, "result": 10}`,
+            expectedStatus: http.StatusBadRequest,
+        },
+        {
+            name:           "Invalid task ID",
+            body:           `{"id": 999, "result": 5}`,
+            expectedStatus: http.StatusNotFound,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            t.Logf("Запуск теста: %s", tt.name)
+            req := httptest.NewRequest("POST", "/api/v1/task/result", strings.NewReader(tt.body))
+            w := httptest.NewRecorder()
+
+            t.Logf("Отправляем запрос с телом: %s", tt.body)
+            handler.UpdateTaskResult(w, req)
+
+            t.Logf("Ответ получен с кодом: %d", w.Code)
+            if status := w.Code; status != tt.expectedStatus {
+                t.Errorf("Ожидался статус %d, но получили %d", tt.expectedStatus, status)
+            }
+        })
+    }
+}
+
 func TestDeleteAllTasks(t *testing.T) {
     handler.TaskQueue = []handler.Task{
         {ID: 1, Expression: "3 + 3", Status: "pending"},
